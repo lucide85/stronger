@@ -15,6 +15,7 @@ model User {
   passwordHash String
   name         String
   createdAt    DateTime @default(now())
+  weeklyRunningGoal Int @default(2)
 
   garminAccount         GarminAccount?
   pushSubscriptions      PushSubscription[]

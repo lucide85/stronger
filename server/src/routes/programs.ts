@@ -15,6 +15,38 @@ programsRouter.get("/", async (req: AuthedRequest, res) => {
   res.json(programs);
 });
 
+// Which workout is "next up": the active program's days form a rotation
+// (Push A → Pull A → Legs A → Push A → …), independent of calendar day, so
+// training 2x or 5x a week both just advance the rotation naturally.
+programsRouter.get("/next-workout", async (req: AuthedRequest, res) => {
+  const program = await prisma.workoutProgram.findFirst({
+    where: { userId: req.userId, isActive: true },
+    orderBy: { createdAt: "desc" },
+    include: {
+      days: { include: { exercises: { include: { exercise: true }, orderBy: { order: "asc" } } }, orderBy: { order: "asc" } },
+    },
+  });
+
+  if (!program || program.days.length === 0) {
+    return res.json({ program: null, day: null });
+  }
+
+  const lastCompleted = await prisma.workoutSession.findFirst({
+    where: { userId: req.userId, completedAt: { not: null }, programDayId: { in: program.days.map((d) => d.id) } },
+    orderBy: { completedAt: "desc" },
+  });
+
+  let nextDay = program.days[0];
+  if (lastCompleted) {
+    const lastIndex = program.days.findIndex((d) => d.id === lastCompleted.programDayId);
+    if (lastIndex !== -1) {
+      nextDay = program.days[(lastIndex + 1) % program.days.length];
+    }
+  }
+
+  res.json({ program: { id: program.id, name: program.name }, day: nextDay });
+});
+
 const programSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),

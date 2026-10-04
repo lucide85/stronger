@@ -24,11 +24,22 @@ export function Settings() {
   const [password, setPassword] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [pushStatus, setPushStatus] = useState<string>("");
+  const [runningGoal, setRunningGoal] = useState("2");
+  const [goalSaved, setGoalSaved] = useState(false);
 
   function reload() {
     apiFetch<GarminStatus>("/garmin/status").then(setGarmin).catch(() => {});
+    apiFetch<{ weeklyRunningGoal: number }>("/running/goal")
+      .then((g) => setRunningGoal(String(g.weeklyRunningGoal)))
+      .catch(() => {});
   }
   useEffect(reload, []);
+
+  async function saveRunningGoal() {
+    await apiFetch("/running/goal", { method: "PUT", body: JSON.stringify({ weeklyRunningGoal: Number(runningGoal) || 0 }) });
+    setGoalSaved(true);
+    setTimeout(() => setGoalSaved(false), 2000);
+  }
 
   async function connectGarmin() {
     await apiFetch("/garmin/connect", { method: "POST", body: JSON.stringify({ email, password }) });
@@ -103,6 +114,25 @@ export function Settings() {
             </button>
           </div>
         )}
+      </Panel>
+
+      <Panel accent="#3DDAD7" className="p-6 flex flex-col gap-3">
+        <span className="font-mono text-xs tracking-widest text-cyan">LØPEMÅL</span>
+        <span className="font-sans text-sm text-secondary">Hvor mange løpeøkter er målet per uke?</span>
+        <div className="flex gap-2 items-center">
+          <input
+            className="w-20 bg-raised border border-hair-bright px-3 py-2 text-sm font-mono"
+            type="number"
+            min={0}
+            max={14}
+            value={runningGoal}
+            onChange={(e) => setRunningGoal(e.target.value)}
+          />
+          <button className="font-display text-xs font-bold uppercase bg-cyan text-[#06211F] px-4 py-2" onClick={saveRunningGoal}>
+            LAGRE
+          </button>
+          {goalSaved && <span className="font-mono text-[11px] text-cyan">Lagret ✓</span>}
+        </div>
       </Panel>
 
       <Panel accent="#B7FF3C" className="p-6 flex flex-col gap-3">

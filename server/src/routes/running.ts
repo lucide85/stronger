@@ -15,6 +15,24 @@ runningRouter.get("/", async (req: AuthedRequest, res) => {
   res.json(workouts);
 });
 
+runningRouter.get("/goal", async (req: AuthedRequest, res) => {
+  const user = await prisma.user.findUnique({ where: { id: req.userId }, select: { weeklyRunningGoal: true } });
+  res.json({ weeklyRunningGoal: user?.weeklyRunningGoal ?? 2 });
+});
+
+const goalSchema = z.object({ weeklyRunningGoal: z.number().int().min(0).max(14) });
+
+runningRouter.put("/goal", async (req: AuthedRequest, res) => {
+  const parsed = goalSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const user = await prisma.user.update({
+    where: { id: req.userId },
+    data: { weeklyRunningGoal: parsed.data.weeklyRunningGoal },
+    select: { weeklyRunningGoal: true },
+  });
+  res.json(user);
+});
+
 const manualSchema = z.object({
   type: z.enum(["easy", "interval", "long", "race", "other"]).default("easy"),
   startedAt: z.coerce.date(),
