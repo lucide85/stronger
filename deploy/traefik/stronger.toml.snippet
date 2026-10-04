@@ -1,0 +1,36 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Traefik-VM-en din kjører Traefik v2 med TOML file provider, konfigurert som ÉN
+# fil (/srv/services.toml, se [providers.file] i /srv/traefik.toml) — ikke en
+# mappe med én fil per app. Dette er derfor en SNIPPET du limer inn NEDERST i
+# /srv/services.toml (samme fil som har routerne for treningsapp/fotballvm/things),
+# ikke en frittstående fil Traefik leser direkte.
+#
+# Din traefik.toml bruker entryPoints "http"/"https" og certResolver "wilson"
+# (ikke de vanlige "websecure"/"letsencrypt" navnene) — det er alt reflektert her.
+#
+# [providers.file] i /srv/traefik.toml har ingen "watch = true", så Traefik må
+# restartes manuelt etter at denne snippeten er limt inn:
+#   sudo docker restart docker_reverse-proxy_1
+# ─────────────────────────────────────────────────────────────────────────────
+
+  [http.services.stronger]
+    [http.services.stronger.loadBalancer]
+    [[http.services.stronger.loadBalancer.servers]]
+      url = "http://192.168.1.25:3005/"
+
+  [http.routers.stronger]
+    rule = "Host(`stronger.vikane.cloud`)"
+    entryPoints = ["https"]
+    service = "stronger"
+    [http.routers.stronger.tls]
+      certResolver = "wilson"
+
+  [http.routers.stronger-http]
+    rule = "Host(`stronger.vikane.cloud`)"
+    entryPoints = ["http"]
+    service = "stronger"
+    middlewares = ["stronger-redirect"]
+
+  [http.middlewares.stronger-redirect.redirectScheme]
+    scheme = "https"
+    permanent = true

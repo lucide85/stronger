@@ -117,13 +117,26 @@ oppdatering. `docker-entrypoint.sh` tar en automatisk sikkerhetskopi før hver
 
 ### Steg 3 – Rut domenet til appen (på Traefik-VM-en)
 
-Kopier [`deploy/traefik/stronger.yml`](deploy/traefik/stronger.yml) til Traefiks
-dynamiske mappe (samme mappe du allerede brukte for `treningsapp.yml`, typisk
-`/etc/traefik/dynamic/`), og juster IP-en i `url:` hvis app-VM-en din ikke er
-`192.168.1.25`. Domenet er satt til `stronger.vikane.cloud` — bytt om du vil ha noe annet.
+Traefik-VM-en din kjører Traefik v2 (container `docker_reverse-proxy_1`) med
+dynamisk config som **én TOML-fil**, `/srv/services.toml` — ikke en mappe med én
+fil per app. Entrypoints heter `http`/`https` og cert-resolveren heter `wilson`
+(se `/srv/traefik.toml`). Lim inn snippeten fra
+[`deploy/traefik/stronger.toml.snippet`](deploy/traefik/stronger.toml.snippet)
+nederst i `/srv/services.toml`, etter de eksisterende blokkene (samme stil som
+`things`/`fotballvm`):
 
-Med `watch: true` i Traefiks file-provider plukkes den opp automatisk, ellers:
-`docker restart traefik` (eller `sudo systemctl restart traefik`).
+```bash
+sudo tee -a /srv/services.toml > /dev/null <<'EOF'
+<innhold fra deploy/traefik/stronger.toml.snippet, uten kommentarblokken øverst>
+EOF
+```
+
+`[providers.file]` i `/srv/traefik.toml` har ingen `watch = true`, så Traefik må
+restartes manuelt etterpå:
+
+```bash
+sudo docker restart docker_reverse-proxy_1
+```
 
 ### Steg 4 – Verifiser
 
