@@ -1,0 +1,36 @@
+services:
+  server:
+    build: ./server
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "file:/data/stronger.db"
+      PORT: "3001"
+    volumes:
+      - stronger-data:/data
+      - ./config.json:/app/config.json:ro
+    networks:
+      - web
+      - internal
+
+  client:
+    build: ./client
+    restart: unless-stopped
+    depends_on:
+      - server
+    networks:
+      - web
+      - internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.stronger.rule=Host(`stronger.DITT-DOMENE.no`)"
+      - "traefik.http.routers.stronger.entrypoints=websecure"
+      - "traefik.http.routers.stronger.tls.certresolver=letsencrypt"
+      - "traefik.http.services.stronger.loadbalancer.server.port=80"
+
+volumes:
+  stronger-data:
+
+networks:
+  web:
+    external: true
+  internal:

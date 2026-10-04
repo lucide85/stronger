@@ -1,0 +1,10 @@
+{
+  "anthropicApiKey": "sk-ant-...",
+  "push": {
+    "vapidPublicKey": "",
+    "vapidPrivateKey": "",
+    "vapidSubject": "mailto:deg@example.com"
+  },
+  "sessionSecret": "bytt-meg-til-noe-tilfeldig",
+  "measurementReminderDays": 14
+}

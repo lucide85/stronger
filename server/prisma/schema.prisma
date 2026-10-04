@@ -1,0 +1,224 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Users & auth ----------
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+
+  garminAccount         GarminAccount?
+  pushSubscriptions      PushSubscription[]
+  programs               WorkoutProgram[]
+  sessions               WorkoutSession[]
+  runningWorkouts        RunningWorkout[]
+  bodyMeasurements       BodyMeasurement[]
+  measurementReminder    MeasurementReminder?
+  createdExercises       Exercise[]
+}
+
+model GarminAccount {
+  id                 String    @id @default(cuid())
+  userId             String    @unique
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email              String
+  // Encrypted with server-side key (see src/services/crypto.ts). Never store plaintext.
+  encryptedPassword  String
+  lastActivitySyncAt DateTime?
+  lastBodyCompSyncAt DateTime?
+  createdAt          DateTime  @default(now())
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+}
+
+// ---------- Strength: library, programs, sessions ----------
+
+model Exercise {
+  id              String   @id @default(cuid())
+  name            String
+  muscleGroup     String? // e.g. "chest", "back", "legs"
+  equipment       String? // e.g. "barbell", "dumbbell", "machine", "bodyweight"
+  notes           String?
+  createdByUserId String?
+  createdBy       User?    @relation(fields: [createdByUserId], references: [id])
+  createdAt       DateTime @default(now())
+
+  programExercises ProgramExercise[]
+  sessionExercises SessionExercise[]
+}
+
+model WorkoutProgram {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  days ProgramDay[]
+}
+
+model ProgramDay {
+  id        String  @id @default(cuid())
+  programId String
+  program   WorkoutProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  name      String // e.g. "Push A"
+  order     Int
+
+  exercises ProgramExercise[]
+  sessions  WorkoutSession[]
+}
+
+model ProgramExercise {
+  id                 String   @id @default(cuid())
+  programDayId       String
+  programDay         ProgramDay @relation(fields: [programDayId], references: [id], onDelete: Cascade)
+  exerciseId         String
+  exercise           Exercise @relation(fields: [exerciseId], references: [id])
+  order              Int
+
+  targetSets         Int
+  targetRepsMin      Int
+  targetRepsMax      Int
+  targetWeightKg      Float
+  restSeconds        Int      @default(90)
+  // "double-progression" | "linear" | "percentage" | "manual"
+  progressionScheme  String   @default("double-progression")
+  notes              String?
+
+  sessionExercises   SessionExercise[]
+  suggestions        ProgressionSuggestion[]
+}
+
+model WorkoutSession {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  programDayId String?
+  programDay   ProgramDay? @relation(fields: [programDayId], references: [id])
+  startedAt    DateTime @default(now())
+  completedAt  DateTime?
+  notes        String?
+
+  exercises SessionExercise[]
+}
+
+model SessionExercise {
+  id                String   @id @default(cuid())
+  workoutSessionId  String
+  workoutSession    WorkoutSession @relation(fields: [workoutSessionId], references: [id], onDelete: Cascade)
+  exerciseId        String
+  exercise          Exercise @relation(fields: [exerciseId], references: [id])
+  programExerciseId String?
+  programExercise   ProgramExercise? @relation(fields: [programExerciseId], references: [id])
+  order             Int
+
+  // Feedback given after finishing the exercise, drives the AI progression suggestion.
+  // "could_do_more" | "on_target" | "could_not_complete" | null (not answered yet)
+  feedback     String?
+  feedbackNote String?
+
+  sets        SetLog[]
+  suggestion  ProgressionSuggestion?
+}
+
+model SetLog {
+  id                String   @id @default(cuid())
+  sessionExerciseId String
+  sessionExercise   SessionExercise @relation(fields: [sessionExerciseId], references: [id], onDelete: Cascade)
+  setNumber         Int
+  targetReps        Int?
+  targetWeightKg    Float?
+  actualReps        Int
+  actualWeightKg    Float
+  rpe               Float?
+  completedAt       DateTime @default(now())
+}
+
+model ProgressionSuggestion {
+  id                String   @id @default(cuid())
+  sessionExerciseId String   @unique
+  sessionExercise   SessionExercise @relation(fields: [sessionExerciseId], references: [id], onDelete: Cascade)
+  programExerciseId String?
+  programExercise   ProgramExercise? @relation(fields: [programExerciseId], references: [id])
+
+  suggestedSets       Int
+  suggestedRepsMin    Int
+  suggestedRepsMax    Int
+  suggestedWeightKg   Float
+  rationale           String // short natural-language explanation from the AI agent
+  // "pending" | "accepted" | "rejected" | "auto_applied"
+  status              String  @default("pending")
+  createdAt           DateTime @default(now())
+  resolvedAt          DateTime?
+}
+
+// ---------- Running ----------
+
+model RunningWorkout {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // "manual" | "garmin"
+  source          String
+  garminActivityId String? @unique
+  // "easy" | "interval" | "long" | "race" | "other"
+  type            String   @default("easy")
+  startedAt       DateTime
+  durationSeconds Int
+  distanceMeters  Float
+  avgPaceSecPerKm Int?
+  avgHeartRate    Int?
+  elevationGainM  Float?
+  notes           String?
+  rawData         String? // JSON blob with splits etc., parsed from FIT when source=garmin
+  createdAt       DateTime @default(now())
+}
+
+// ---------- Body measurements ----------
+
+model BodyMeasurement {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recordedAt    DateTime @default(now())
+  // "manual" | "garmin"
+  source        String
+  weightKg      Float?
+  bodyFatPct    Float?
+  muscleMassKg  Float?
+  bodyWaterPct  Float?
+  waistCm       Float?
+  hipCm         Float?
+  thighCm       Float?
+  armCm         Float?
+  chestCm       Float?
+  notes         String?
+}
+
+model MeasurementReminder {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  intervalDays   Int      @default(14)
+  lastRemindedAt DateTime?
+  nextDueAt      DateTime?
+}
