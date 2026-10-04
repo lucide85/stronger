@@ -1,5 +1,5 @@
 # Kjøres på app-VM-en (samme VM som treningsapp/run, men egen container + port).
-# Traefik står på en annen VM og ruter over nettverket til http://<APP_VM_IP>:3002.
+# Traefik står på en annen VM og ruter over nettverket til http://<APP_VM_IP>:3005.
 services:
   stronger:
     build: .
@@ -10,11 +10,11 @@ services:
     init: true
     ports:
       # Eksponer porten på app-VM-en slik at Traefik-VM-en når den.
-      # Vil du kun slippe inn Traefik, bind til LAN-IP-en: "192.168.x.y:3002:3002"
-      - "3002:3002"
+      # Vil du kun slippe inn Traefik, bind til LAN-IP-en: "192.168.x.y:3005:3005"
+      - "3005:3005"
     environment:
       - NODE_ENV=production
-      - PORT=3002
+      - PORT=3005
       - DATABASE_URL=file:/app/server/prisma/data/stronger.db
     volumes:
       # Hemmeligheter (Anthropic-nøkkel, VAPID-nøkler, sessionSecret) – read-only
@@ -22,7 +22,7 @@ services:
       # Persistente data (SQLite-databasen) – overlever omstart/oppdatering
       - stronger-data:/app/server/prisma/data
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://localhost:3002/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3005/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 5s
       retries: 5

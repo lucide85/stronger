@@ -25,5 +25,5 @@ http:
       loadBalancer:
         passHostHeader: true
         servers:
-          # ← IP-en til APP-VM-en (samme VM som treningsapp/run), port 3002
-          - url: "http://192.168.1.25:3002"
+          # ← IP-en til APP-VM-en (samme VM som treningsapp/run), port 3005
+          - url: "http://192.168.1.25:3005"

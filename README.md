@@ -82,17 +82,17 @@ Samme oppsett som treningsapp/run: **appen kjører som Docker-container på app-
 og **Traefik kjører på en annen VM** og ruter trafikk fra domenet ditt inn over HTTPS.
 I produksjon serverer appen alt (API + frontend) fra **én port**. Siden run-appen
 allerede bruker port 3001 på app-VM-en, kjører Stronger som en egen container ved
-siden av, på **port 3002**.
+siden av, på **port 3005**.
 
 ```
-Internett → ruter (port 80/443) → Traefik-VM → http://<APP_VM_IP>:3002 → stronger-container
+Internett → ruter (port 80/443) → Traefik-VM → http://<APP_VM_IP>:3005 → stronger-container
    DNS: stronger.vikane.cloud ─────┘             (Traefik håndterer TLS/Let's Encrypt)
 ```
 
 ### Steg 1 – Brannmur på app-VM-en
 
 ```bash
-sudo ufw allow from <TRAEFIK_VM_IP> to any port 3002 proto tcp
+sudo ufw allow from <TRAEFIK_VM_IP> to any port 3005 proto tcp
 ```
 
 ### Steg 2 – Hent og start appen (på app-VM-en, ved siden av treningsapp)
@@ -107,8 +107,8 @@ nano config.json   # fyll inn anthropicApiKey, VAPID-nøkler (se under), session
 npx --yes web-push generate-vapid-keys
 
 docker compose up -d --build
-docker compose logs -f        # skal vise «Stronger API listening on :3002»
-curl -I http://localhost:3002/api/health
+docker compose logs -f        # skal vise «Stronger API listening on :3005»
+curl -I http://localhost:3005/api/health
 ```
 
 Databasen (SQLite) lagres på Docker-volumet `stronger-data` og overlever omstart og
