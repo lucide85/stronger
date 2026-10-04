@@ -1,36 +1,32 @@
+# Kjøres på app-VM-en (samme VM som treningsapp/run, men egen container + port).
+# Traefik står på en annen VM og ruter over nettverket til http://<APP_VM_IP>:3002.
 services:
-  server:
-    build: ./server
+  stronger:
+    build: .
+    image: stronger:latest
+    container_name: stronger
     restart: unless-stopped
+    # init-prosess videresender SIGTERM riktig ved `docker stop`
+    init: true
+    ports:
+      # Eksponer porten på app-VM-en slik at Traefik-VM-en når den.
+      # Vil du kun slippe inn Traefik, bind til LAN-IP-en: "192.168.x.y:3002:3002"
+      - "3002:3002"
     environment:
-      DATABASE_URL: "file:/data/stronger.db"
-      PORT: "3001"
+      - NODE_ENV=production
+      - PORT=3002
+      - DATABASE_URL=file:/app/server/prisma/data/stronger.db
     volumes:
-      - stronger-data:/data
+      # Hemmeligheter (Anthropic-nøkkel, VAPID-nøkler, sessionSecret) – read-only
       - ./config.json:/app/config.json:ro
-    networks:
-      - web
-      - internal
-
-  client:
-    build: ./client
-    restart: unless-stopped
-    depends_on:
-      - server
-    networks:
-      - web
-      - internal
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.stronger.rule=Host(`stronger.DITT-DOMENE.no`)"
-      - "traefik.http.routers.stronger.entrypoints=websecure"
-      - "traefik.http.routers.stronger.tls.certresolver=letsencrypt"
-      - "traefik.http.services.stronger.loadbalancer.server.port=80"
+      # Persistente data (SQLite-databasen) – overlever omstart/oppdatering
+      - stronger-data:/app/server/prisma/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3002/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
 volumes:
   stronger-data:
-
-networks:
-  web:
-    external: true
-  internal:

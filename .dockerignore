@@ -1,0 +1,14 @@
+node_modules
+**/node_modules
+dist
+**/dist
+dev-dist
+**/dev-dist
+.git
+.gitignore
+config.json
+*.db
+*.db-journal
+server/prisma/dev.db*
+.garmin-session.json
+*.tsbuildinfo

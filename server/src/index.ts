@@ -1,6 +1,8 @@
 import "express-async-errors";
 import express from "express";
 import cors from "cors";
+import path from "node:path";
+import fs from "node:fs";
 import type { NextFunction, Request, Response } from "express";
 import { authRouter } from "./routes/auth.js";
 import { exercisesRouter } from "./routes/exercises.js";
@@ -31,6 +33,15 @@ app.use("/api/running", runningRouter);
 app.use("/api/measurements", measurementsRouter);
 app.use("/api/push", pushRouter);
 app.use("/api/garmin", garminRouter);
+
+// In production the client's built static files live alongside this server
+// (WORKDIR /app, copied in by the Dockerfile) — serve them, with an SPA
+// fallback so client-side routes like /strength survive a hard refresh.
+const clientDist = path.join(process.cwd(), "client", "dist");
+if (fs.existsSync(clientDist)) {
+  app.use(express.static(clientDist));
+  app.get(/^(?!\/api).*/, (_req, res) => res.sendFile(path.join(clientDist, "index.html")));
+}
 
 // Catches every error thrown or rejected in a route handler (express-async-errors
 // makes async throws reach here too) so one failing request returns a clean 500

@@ -14,7 +14,8 @@ designarbeid i Claude design.
 - **Garmin-synk** — `garmin-connect`-biblioteket (samme tilnærming som i run-appen), per bruker
 - **AI-progresjon** — Claude API (`@anthropic-ai/sdk`)
 - **Push-varsler** — Web Push / VAPID for påminnelser om kroppsmål
-- **Drift** — Docker Compose bak Traefik, som run-appen
+- **Drift** — Én Docker-container (server serverer bygget frontend statisk) bak Traefik
+  på en annen VM, akkurat som treningsapp/run
 
 ## Kom i gang (lokal utvikling)
 
@@ -75,11 +76,74 @@ designarbeid i Claude design.
   Garmin Connect sitt uoffisielle API. Sjekk dem mot den faktiske pakken når den er
   installert (`node_modules/garmin-connect`), og juster om nødvendig — akkurat som i
   run-appen kan Garmins API endre seg mellom versjoner.
-- **Prisma-migrasjon**: kjør `npm run prisma:migrate` i `server/` for å generere den
-  første migrasjonsfilen (ligger ikke committet ennå).
-- **Docker/Traefik**: bytt ut `stronger.DITT-DOMENE.no` i `docker-compose.yml` med riktig
-  (sub)domene, og pass på at `config.json` ligger ved siden av `docker-compose.yml` på
-  serveren (den mountes read-only inn i `server`-containeren).
+## Publisering hjemme med Docker + Traefik
+
+Samme oppsett som treningsapp/run: **appen kjører som Docker-container på app-VM-en**,
+og **Traefik kjører på en annen VM** og ruter trafikk fra domenet ditt inn over HTTPS.
+I produksjon serverer appen alt (API + frontend) fra **én port**. Siden run-appen
+allerede bruker port 3001 på app-VM-en, kjører Stronger som en egen container ved
+siden av, på **port 3002**.
+
+```
+Internett → ruter (port 80/443) → Traefik-VM → http://<APP_VM_IP>:3002 → stronger-container
+   DNS: stronger.vikane.cloud ─────┘             (Traefik håndterer TLS/Let's Encrypt)
+```
+
+### Steg 1 – Brannmur på app-VM-en
+
+```bash
+sudo ufw allow from <TRAEFIK_VM_IP> to any port 3002 proto tcp
+```
+
+### Steg 2 – Hent og start appen (på app-VM-en, ved siden av treningsapp)
+
+```bash
+git clone https://github.com/lucide85/stronger.git
+cd stronger
+cp config.example.json config.json
+nano config.json   # fyll inn anthropicApiKey, VAPID-nøkler (se under), sessionSecret
+
+# Generer VAPID-nøkler for push-varsler om du ikke har gjort det lokalt:
+npx --yes web-push generate-vapid-keys
+
+docker compose up -d --build
+docker compose logs -f        # skal vise «Stronger API listening on :3002»
+curl -I http://localhost:3002/api/health
+```
+
+Databasen (SQLite) lagres på Docker-volumet `stronger-data` og overlever omstart og
+oppdatering. `docker-entrypoint.sh` tar en automatisk sikkerhetskopi før hver
+`prisma migrate deploy` (de 7 nyeste beholdes på volumet).
+
+### Steg 3 – Rut domenet til appen (på Traefik-VM-en)
+
+Kopier [`deploy/traefik/stronger.yml`](deploy/traefik/stronger.yml) til Traefiks
+dynamiske mappe (samme mappe du allerede brukte for `treningsapp.yml`, typisk
+`/etc/traefik/dynamic/`), og juster IP-en i `url:` hvis app-VM-en din ikke er
+`192.168.1.25`. Domenet er satt til `stronger.vikane.cloud` — bytt om du vil ha noe annet.
+
+Med `watch: true` i Traefiks file-provider plukkes den opp automatisk, ellers:
+`docker restart traefik` (eller `sudo systemctl restart traefik`).
+
+### Steg 4 – Verifiser
+
+1. Opprett en DNS A-record `stronger.vikane.cloud` → din offentlige IP (om ikke gjort).
+2. Åpne `https://stronger.vikane.cloud` — gyldig sertifikat og innloggingssiden.
+3. Installer som app på mobil (Legg til på Hjem-skjerm / Installer app).
+
+### Oppdatere appen senere
+
+```bash
+cd stronger && git pull && docker compose up -d --build   # data beholdes
+```
+
+## Viktige TODOer før dette er "ferdig"
+
+- **PWA-ikoner**: `client/public/icons/icon-192.png` og `icon-512.png` er bare midlertidige
+  1×1-piksel-plassholdere. Bytt dem ut med ekte ikoner i riktig størrelse.
+- **`garmin-connect`-biblioteket**: feltnavnene i `garminSync.ts` er sjekket mot pakkens
+  publiserte typer for v1.6.2, men Garmins uoffisielle API kan endre seg — verifiser mot
+  faktisk kontodata ved første synk.
 
 ## Designkonsept
 
