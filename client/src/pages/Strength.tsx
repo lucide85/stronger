@@ -1,11 +1,22 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../api/client";
 import { Panel } from "../components/Panel";
+import { ExercisePicker } from "../components/ExercisePicker";
+import { TrendChart, IntervalTabs, cutoffDateForInterval } from "../components/TrendChart";
 
 interface Exercise {
   id: string;
   name: string;
+  muscleGroup: string | null;
+  pictogramKey: string | null;
+}
+
+interface HistoryPoint {
+  date: string;
+  maxWeightKg: number;
+  totalVolumeKg: number;
+  sets: number;
 }
 
 interface ProgramExercise {
@@ -50,12 +61,35 @@ export function Strength() {
   const [repsMax, setRepsMax] = useState("12");
   const [weight, setWeight] = useState("20");
 
+  const [progressExerciseId, setProgressExerciseId] = useState("");
+  const [progressInterval, setProgressInterval] = useState("3m");
+  const [history, setHistory] = useState<HistoryPoint[]>([]);
+  const [progressMetric, setProgressMetric] = useState<"maxWeightKg" | "totalVolumeKg">("maxWeightKg");
+
   function reload() {
     apiFetch<Program[]>("/programs").then(setPrograms).catch(() => {});
     apiFetch<Exercise[]>("/exercises").then(setExercises).catch(() => {});
   }
 
   useEffect(reload, []);
+
+  useEffect(() => {
+    if (!progressExerciseId && exercises.length > 0) {
+      setProgressExerciseId(exercises[0].id);
+    }
+  }, [exercises, progressExerciseId]);
+
+  useEffect(() => {
+    if (!progressExerciseId) return;
+    apiFetch<HistoryPoint[]>(`/exercises/${progressExerciseId}/history`).then(setHistory).catch(() => {});
+  }, [progressExerciseId]);
+
+  const progressChartData = useMemo(() => {
+    const cutoff = cutoffDateForInterval(progressInterval);
+    return history
+      .filter((h) => !cutoff || new Date(h.date) >= cutoff)
+      .map((h) => ({ date: new Date(h.date), value: h[progressMetric] }));
+  }, [history, progressInterval, progressMetric]);
 
   async function createProgram() {
     if (!newProgramName.trim()) return;
@@ -174,20 +208,8 @@ export function Strength() {
 
               {exerciseFormFor === day.id && (
                 <div className="flex flex-col gap-2 bg-raised border border-hair-bright p-3">
-                  <input
-                    autoFocus
-                    list="exercise-options"
-                    className={inputClass}
-                    placeholder="Øvelsesnavn"
-                    value={exerciseName}
-                    onChange={(e) => setExerciseName(e.target.value)}
-                  />
-                  <datalist id="exercise-options">
-                    {exercises.map((e) => (
-                      <option key={e.id} value={e.name} />
-                    ))}
-                  </datalist>
-                  <div className="flex gap-2">
+                  <ExercisePicker exercises={exercises} value={exerciseName} onChange={setExerciseName} accent="#FF8C42" />
+                  <div className="flex gap-2 mt-1">
                     <input
                       className={`${inputClass} w-20`}
                       type="number"
@@ -230,6 +252,35 @@ export function Strength() {
           ))}
         </Panel>
       ))}
+
+      {exercises.length > 0 && (
+        <Panel accent="#FF8C42" className="p-6 flex flex-col gap-3">
+          <span className="font-display text-base font-bold">FREMGANG</span>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <select
+              className="bg-raised border border-hair-bright px-2 py-1.5 font-mono text-xs flex-1 min-w-[160px]"
+              value={progressExerciseId}
+              onChange={(e) => setProgressExerciseId(e.target.value)}
+            >
+              {exercises.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.name}
+                </option>
+              ))}
+            </select>
+            <select
+              className="bg-raised border border-hair-bright px-2 py-1.5 font-mono text-xs"
+              value={progressMetric}
+              onChange={(e) => setProgressMetric(e.target.value as "maxWeightKg" | "totalVolumeKg")}
+            >
+              <option value="maxWeightKg">Toppvekt</option>
+              <option value="totalVolumeKg">Volum</option>
+            </select>
+            <IntervalTabs value={progressInterval} onChange={setProgressInterval} accent="#FF8C42" />
+          </div>
+          <TrendChart data={progressChartData} color="#FF8C42" unit={progressMetric === "maxWeightKg" ? "KG" : "KG·REPS"} />
+        </Panel>
+      )}
 
       <Panel className="p-6 flex gap-3 items-center">
         <input

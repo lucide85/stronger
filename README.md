@@ -67,6 +67,24 @@ designarbeid i Claude design.
   Garmin-synkede rader fylles av `server/src/services/garminSync.ts`, kjørt manuelt fra
   Innstillinger eller automatisk hver morgen via cron-jobben i `server/src/services/cron.ts`.
 
+## Øvelsesbibliotek og fremgangsgrafer
+
+- `server/src/services/exerciseLibrary.ts` har ~40 vanlige øvelser kategorisert per
+  muskelgruppe (bryst/rygg/skuldre/biceps/triceps/bein/mage). Seedes idempotent ved hver
+  oppstart (`seedExerciseLibrary()` i `server/src/services/seed.ts`) — trygt å utvide
+  listen senere, nye rader plukkes opp automatisk uten å påvirke eksisterende data.
+- `client/src/components/ExercisePicker.tsx` lar deg velge fra biblioteket (filtrert per
+  muskelgruppe + søk) når du legger til en øvelse i et program, med fallback til å skrive
+  inn en egen øvelse.
+- `client/src/data/pictograms.ts` + `ExercisePictogram.tsx` tegner enkle start/slutt-
+  strekfigurer for de ~10 viktigste sammensatte løftene (knebøy, markløft, benkpress,
+  militærpress, stangdrag, pull-ups, dips, utfall, rumensk markløft, push-ups) — vises
+  under øktlogging og i øvelsesvelgeren. Flere kan legges til ved å definere nye
+  vinkel-/punktsett i samme fil.
+- `GET /api/exercises/:id/history` + `client/src/components/TrendChart.tsx` gir
+  fremgangsgrafer (toppvekt/volum) med valgbare intervaller (4 uker / 3 mnd / 6 mnd / 1 år
+  / alt) — samme komponent brukes for vekt/kroppsmål-trend og løpedistanse/fart-trend.
+
 ## Viktige TODOer før dette er "ferdig"
 
 - **PWA-ikoner**: `client/public/icons/icon-192.png` og `icon-512.png` er bare midlertidige

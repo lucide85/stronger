@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../api/client";
 import { Panel } from "../components/Panel";
+import { TrendChart, IntervalTabs, cutoffDateForInterval } from "../components/TrendChart";
 
 interface RunningWorkout {
   id: string;
@@ -25,11 +26,24 @@ export function Running() {
   const [distanceKm, setDistanceKm] = useState("5.0");
   const [minutes, setMinutes] = useState("25");
   const [type, setType] = useState("easy");
+  const [chartMetric, setChartMetric] = useState<"distance" | "pace">("distance");
+  const [interval, setInterval_] = useState("3m");
 
   function reload() {
     apiFetch<RunningWorkout[]>("/running").then(setWorkouts).catch(() => {});
   }
   useEffect(reload, []);
+
+  const chartData = useMemo(() => {
+    const cutoff = cutoffDateForInterval(interval);
+    return workouts
+      .filter((w) => !cutoff || new Date(w.startedAt) >= cutoff)
+      .filter((w) => chartMetric === "distance" || w.avgPaceSecPerKm != null)
+      .map((w) => ({
+        date: new Date(w.startedAt),
+        value: chartMetric === "distance" ? w.distanceMeters / 1000 : (w.avgPaceSecPerKm ?? 0) / 60,
+      }));
+  }, [workouts, chartMetric, interval]);
 
   async function addRun() {
     const distanceMeters = Number(distanceKm) * 1000;
@@ -77,6 +91,21 @@ export function Running() {
             LOGGFØR
           </button>
         </div>
+      </Panel>
+
+      <Panel accent="#3DDAD7" className="p-5 flex flex-col gap-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <select
+            className="bg-raised border border-hair-bright px-2 py-1.5 font-mono text-xs"
+            value={chartMetric}
+            onChange={(e) => setChartMetric(e.target.value as "distance" | "pace")}
+          >
+            <option value="distance">Distanse</option>
+            <option value="pace">Snittfart</option>
+          </select>
+          <IntervalTabs value={interval} onChange={setInterval_} accent="#3DDAD7" />
+        </div>
+        <TrendChart data={chartData} color="#3DDAD7" unit={chartMetric === "distance" ? "KM" : "MIN/KM"} />
       </Panel>
 
       <div className="flex flex-col gap-3">

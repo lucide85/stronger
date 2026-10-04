@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { apiFetch } from "../api/client";
 import { Panel } from "../components/Panel";
 import { SetTicks } from "../components/SetTicks";
+import { ExercisePictogram } from "../components/ExercisePictogram";
 
 interface SetLog {
   id: string;
@@ -33,7 +34,7 @@ interface Suggestion {
 interface SessionExercise {
   id: string;
   order: number;
-  exercise: { id: string; name: string };
+  exercise: { id: string; name: string; pictogramKey: string | null };
   programExercise: ProgramExercise | null;
   sets: SetLog[];
   feedback: string | null;
@@ -137,6 +138,12 @@ export function SessionLogger() {
       <div style={{ ["--accent" as any]: "#FF8C42" }}>
         <SetTicks total={targetSets} completed={current.sets.length} current={current.sets.length} />
       </div>
+
+      {current.exercise.pictogramKey && (
+        <Panel accent="#FF8C42" className="p-3">
+          <ExercisePictogram pictogramKey={current.exercise.pictogramKey} accent="#FF8C42" />
+        </Panel>
+      )}
 
       <div className="flex gap-3.5">
         <Panel accent="#FF8C42" className="flex-1 p-4 flex flex-col items-center gap-2">

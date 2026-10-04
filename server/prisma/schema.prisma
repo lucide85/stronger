@@ -54,9 +54,13 @@ model PushSubscription {
 model Exercise {
   id              String   @id @default(cuid())
   name            String
-  muscleGroup     String? // e.g. "chest", "back", "legs"
+  // "bryst" | "rygg" | "skuldre" | "biceps" | "triceps" | "bein" | "mage"
+  muscleGroup     String?
   equipment       String? // e.g. "barbell", "dumbbell", "machine", "bodyweight"
   notes           String?
+  // Matches a key in client/src/data/pictograms.ts when a start/slutt-illustrasjon
+  // finnes for øvelsen; null for øvelser uten egen illustrasjon.
+  pictogramKey    String?
   createdByUserId String?
   createdBy       User?    @relation(fields: [createdByUserId], references: [id])
   createdAt       DateTime @default(now())

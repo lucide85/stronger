@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../api/client";
 import { Panel } from "../components/Panel";
+import { TrendChart, IntervalTabs, cutoffDateForInterval } from "../components/TrendChart";
 
 interface Measurement {
   recordedAt: string;
@@ -27,6 +28,8 @@ const FIELDS: { key: keyof Measurement; label: string; unit: string }[] = [
 export function Measure() {
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [form, setForm] = useState<Record<string, string>>({});
+  const [chartField, setChartField] = useState<keyof Measurement>("weightKg");
+  const [interval, setInterval_] = useState("3m");
 
   function reload() {
     apiFetch<Measurement[]>("/measurements").then(setMeasurements).catch(() => {});
@@ -34,6 +37,14 @@ export function Measure() {
   useEffect(reload, []);
 
   const latest = measurements[0];
+
+  const chartData = useMemo(() => {
+    const cutoff = cutoffDateForInterval(interval);
+    return measurements
+      .filter((m) => m[chartField] != null)
+      .filter((m) => !cutoff || new Date(m.recordedAt) >= cutoff)
+      .map((m) => ({ date: new Date(m.recordedAt), value: m[chartField] as number }));
+  }, [measurements, chartField, interval]);
 
   async function save() {
     const payload: Record<string, number> = {};
@@ -60,6 +71,24 @@ export function Measure() {
           </span>
         </Panel>
       )}
+
+      <Panel accent="#B7FF3C" className="p-5 flex flex-col gap-3">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <select
+            className="bg-raised border border-hair-bright px-2 py-1.5 font-mono text-xs"
+            value={chartField}
+            onChange={(e) => setChartField(e.target.value as keyof Measurement)}
+          >
+            {FIELDS.map((f) => (
+              <option key={f.key} value={f.key}>
+                {f.label}
+              </option>
+            ))}
+          </select>
+          <IntervalTabs value={interval} onChange={setInterval_} accent="#B7FF3C" />
+        </div>
+        <TrendChart data={chartData} color="#B7FF3C" unit={FIELDS.find((f) => f.key === chartField)?.unit.toUpperCase()} />
+      </Panel>
 
       <Panel accent="#B7FF3C" className="p-6 flex flex-col">
         {FIELDS.map((f) => (

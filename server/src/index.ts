@@ -13,6 +13,7 @@ import { measurementsRouter } from "./routes/measurements.js";
 import { pushRouter } from "./routes/push.js";
 import { garminRouter } from "./routes/garmin.js";
 import { startCronJobs } from "./services/cron.js";
+import { seedExerciseLibrary } from "./services/seed.js";
 
 // Last-resort safety net: log and keep the process alive instead of crashing on
 // an error that slips outside the Express request cycle (e.g. in the cron jobs).
@@ -54,5 +55,6 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 const port = Number(process.env.PORT ?? 3001);
 app.listen(port, () => {
   console.log(`Stronger API listening on :${port}`);
+  seedExerciseLibrary().catch((e) => console.error("Exercise library seed failed", e));
   startCronJobs();
 });
